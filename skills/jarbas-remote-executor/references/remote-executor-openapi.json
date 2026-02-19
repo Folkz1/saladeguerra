@@ -1,0 +1,81 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Jarbas Remote Executor Bridge",
+    "version": "1.0.0",
+    "description": "Minimal OpenAPI reference for common bridge endpoints used through proxy."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {"description": "OK"}
+        }
+      }
+    },
+    "/run": {
+      "post": {
+        "summary": "Run command synchronously",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tool": {"type": "string", "example": "powershell"},
+                  "command": {"type": "string"},
+                  "cwd": {"type": "string"},
+                  "timeout": {"type": "integer"},
+                  "background": {"type": "boolean"}
+                },
+                "required": ["tool", "command"]
+              }
+            }
+          }
+        },
+        "responses": {"200": {"description": "Execution result"}}
+      }
+    },
+    "/jobs/run": {
+      "post": {
+        "summary": "Run command asynchronously",
+        "responses": {"200": {"description": "Job created"}}
+      }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List jobs",
+        "responses": {"200": {"description": "Jobs list"}}
+      }
+    },
+    "/jobs/{jobId}": {
+      "get": {
+        "summary": "Get job status",
+        "parameters": [
+          {"name": "jobId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Job status"}}
+      }
+    },
+    "/files/read": {
+      "post": {"summary": "Read file", "responses": {"200": {"description": "File content"}}}
+    },
+    "/files/write": {
+      "post": {"summary": "Write file", "responses": {"200": {"description": "Write result"}}}
+    },
+    "/files/list": {
+      "post": {"summary": "List directory", "responses": {"200": {"description": "Directory entries"}}}
+    },
+    "/files/delete": {
+      "post": {"summary": "Delete file or directory", "responses": {"200": {"description": "Delete result"}}}
+    },
+    "/files/info": {
+      "post": {"summary": "Get file info", "responses": {"200": {"description": "File metadata"}}}
+    },
+    "/files/edit": {
+      "post": {"summary": "Edit file content", "responses": {"200": {"description": "Edit result"}}}
+    }
+  }
+}
