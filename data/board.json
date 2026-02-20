@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "title": "Sala de Guerra — Motor 100k",
+    "updatedAt": "2026-02-20T01:40:22.288Z",
+    "target": 100000,
+    "closedRevenue": 0
+  },
+  "columns": [
+    {
+      "id": "p0",
+      "title": "P0 — Dinheiro na Mesa"
+    },
+    {
+      "id": "p1",
+      "title": "P1 — Pipeline Ativo"
+    },
+    {
+      "id": "p2",
+      "title": "P2 — Geração de Demanda"
+    },
+    {
+      "id": "doing",
+      "title": "Em Execução"
+    },
+    {
+      "id": "done",
+      "title": "Concluído"
+    }
+  ],
+  "cards": [
+    {
+      "id": "card-1",
+      "columnId": "p0",
+      "title": "Definir 3 ações de caixa para hoje",
+      "notes": "Escolher ações com impacto em receita em <48h.",
+      "owner": "Diego",
+      "priority": "alta",
+      "due": null,
+      "tags": [
+        "motor100k"
+      ]
+    }
+  ]
+}

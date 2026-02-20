@@ -1,0 +1,20 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Inter, Arial, sans-serif; background: #0b1020; color: #e8edf6; }
+header { padding: 16px 20px; border-bottom: 1px solid #1f2942; position: sticky; top: 0; background: #0b1020; }
+h1 { margin: 0 0 8px 0; font-size: 22px; }
+.meta { display: flex; gap: 12px; flex-wrap: wrap; color: #9fb0d1; font-size: 14px; }
+main { padding: 16px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; }
+.column { background: #121a30; border: 1px solid #253052; border-radius: 12px; min-height: 300px; }
+.column h2 { margin: 0; padding: 12px; border-bottom: 1px solid #253052; font-size: 14px; color: #c7d4f2; }
+.cards { padding: 10px; display: grid; gap: 10px; }
+.card { background: #192443; border: 1px solid #2d3a62; border-radius: 10px; padding: 10px; }
+.card .title { font-weight: 700; margin-bottom: 6px; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.badge { background: #26355e; color: #c6d3f5; border-radius: 999px; font-size: 12px; padding: 2px 8px; }
+.badge.alta { background: #552434; color: #ffd6e2; }
+.badge.media { background: #5a4a1f; color: #ffe7ab; }
+.badge.baixa { background: #214f42; color: #c9ffe9; }
+footer { padding: 8px 16px 16px; color: #7384a9; }
+@media (max-width: 1200px) { .board { grid-template-columns: repeat(2, minmax(220px, 1fr)); } }
+@media (max-width: 680px) { .board { grid-template-columns: 1fr; } }
