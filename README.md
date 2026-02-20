@@ -25,11 +25,32 @@ Preencha estas variáveis no serviço:
 ### Health
 `GET /health`
 
-### Ver board
+### Ver board principal
 `GET /api/board`
 
-### Substituir board inteiro (automação diária)
+### Substituir board principal (automação diária)
 `POST /api/board` com header `x-api-key: UPDATE_API_KEY`
+
+### Listar subpáginas
+`GET /api/pages`
+
+### Ler subpágina
+`GET /api/pages/:slug`
+
+### Criar subpágina
+`POST /api/pages` com `x-api-key`
+
+Payload exemplo:
+```json
+{
+  "slug": "dentaly",
+  "title": "Dentaly",
+  "board": { "meta": {}, "columns": [], "cards": [] }
+}
+```
+
+### Atualizar subpágina
+`POST /api/pages/:slug` com `x-api-key`
 
 Exemplo:
 

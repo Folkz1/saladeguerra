@@ -1,8 +1,13 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Inter, Arial, sans-serif; background: #0b1020; color: #e8edf6; }
-header { padding: 16px 20px; border-bottom: 1px solid #1f2942; position: sticky; top: 0; background: #0b1020; }
+header { padding: 16px 20px; border-bottom: 1px solid #1f2942; position: sticky; top: 0; background: #0b1020; z-index: 2; }
+.top-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 h1 { margin: 0 0 8px 0; font-size: 22px; }
-.meta { display: flex; gap: 12px; flex-wrap: wrap; color: #9fb0d1; font-size: 14px; }
+.home-link { color: #9dc1ff; text-decoration: none; font-size: 13px; border: 1px solid #33508a; padding: 4px 8px; border-radius: 8px; }
+.meta { display: flex; gap: 12px; flex-wrap: wrap; color: #9fb0d1; font-size: 14px; margin-bottom: 10px; }
+.pages { display: flex; gap: 8px; flex-wrap: wrap; }
+.pages a { color: #c6d3f5; text-decoration: none; border: 1px solid #2d3a62; background: #17213b; border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+.pages a.active { border-color: #4d74cc; background: #22305a; color: #eef4ff; }
 main { padding: 16px; }
 .board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; }
 .column { background: #121a30; border: 1px solid #253052; border-radius: 12px; min-height: 300px; }

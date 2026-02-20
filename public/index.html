@@ -8,12 +8,16 @@
 </head>
 <body>
   <header>
-    <h1 id="title">Sala de Guerra</h1>
+    <div class="top-row">
+      <h1 id="title">Sala de Guerra</h1>
+      <a class="home-link" href="/">Início</a>
+    </div>
     <div class="meta">
       <span id="target"></span>
       <span id="revenue"></span>
       <span id="updated"></span>
     </div>
+    <nav id="pages" class="pages"></nav>
   </header>
 
   <main>
@@ -21,7 +25,7 @@
   </main>
 
   <footer>
-    <small>MVP Kanban • Atualização via API</small>
+    <small>MVP Kanban • Atualização via API • Subpáginas: /p/&lt;slug&gt;</small>
   </footer>
 
   <script src="/app.js"></script>
