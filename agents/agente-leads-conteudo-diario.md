@@ -56,40 +56,48 @@ Classificação:
 - **< 5.0**: Descartar
 
 ## Formato de saída (obrigatório)
-Responder exatamente nestes blocos:
+Responder APENAS com estes 4 blocos, nesta ordem:
 
-### 1) RESUMO EXECUTIVO (5 linhas)
-- Oportunidade do dia
-- Tema principal
-- Objetivo comercial
-- CTA principal
-- Risco/ponto de atenção
+### 1) THUMBNAILS (3 PROMPTS CRIATIVOS)
+- Prompt 1 (detalhado para gerar thumbnail)
+- Prompt 2 (detalhado para gerar thumbnail)
+- Prompt 3 (detalhado para gerar thumbnail)
 
-### 2) TEMA PRINCIPAL (LUCAS + ELTON)
+Regras:
+- Cada prompt deve conectar com o tema e com promessa clara.
+- Alto contraste, emoção e elemento visual de prova/resultados.
+- Evitar genérico.
+
+### 2) TÍTULOS (3 OPÇÕES)
 - Título 1
 - Título 2
 - Título 3
-- Hook de abertura (15-25s)
-- Tese central (1 frase)
-- Estrutura do vídeo longo (5-7 bullets)
-- Versão short (30-45s)
-- Prompt de thumbnail
-- CTA WhatsApp (texto pronto)
 
-### 3) TEMA RESERVA
-- Títulos (3)
-- Hook
-- CTA
+Regras:
+- Cada título deve combinar com pelo menos um dos thumbnails.
+- Misturar curiosidade + benefício + especificidade.
+- Linguagem de humano, sem parecer IA.
 
-### 4) DISTRIBUIÇÃO (copiar/colar)
-- Mensagem para WhatsApp status/lista
-- Mensagem para Telegram
-- Mensagem para LinkedIn
+### 3) DESCRIÇÃO DO VÍDEO (COMERCIAL + LINKS)
+Entregar descrição completa pronta para YouTube com:
+- Gancho de abertura (2-3 linhas)
+- Resumo objetivo do vídeo
+- CTA comercial principal
+- Link do WhatsApp já pronto (wa.me)
+- CTA secundário (ex: comentar palavra-chave)
+- 3-5 hashtags relevantes
 
-### 5) IMPACTO NO FUNIL (hoje)
-- Leads esperados
-- Conversas esperadas
-- Próxima ação comercial após postar
+### 4) BRIEFING DE PRODUÇÃO (COMPLETO)
+Entregar um briefing enxuto e executável contendo:
+- Objetivo do vídeo
+- Público-alvo
+- Ângulo narrativo (Lucas)
+- Ângulo de performance (Elton)
+- Roteiro em blocos (abertura, prova, explicação, oferta, fechamento)
+- Materiais a apresentar na tela (prints, dashboards, chats, exemplos, etc.)
+- Formato de gravação obrigatório: webcam + tela do computador + OBS
+- Duração sugerida e ritmo de edição
+- 3 erros a evitar nesse vídeo
 
 ## Prompt de disparo diário (operacional)
 Use este prompt para rodar o agente:
@@ -98,16 +106,25 @@ Use este prompt para rodar o agente:
 Execute o Agente Leads + Conteúdo Diário (Lucas + Elton).
 
 Contexto de hoje:
-- Meta: Motor 100k
-- Prioridade: gerar conversas de venda no WhatsApp
+- Projeto: Motor 100k
+- Canal: GuyFolkz
+- Objetivo: gerar leads e conversas comerciais no WhatsApp
 - Produto foco: Radar PNCP
 
-Faça leitura do estado atual do pipeline e das conversas recentes.
-Depois gere o output no formato obrigatório (Resumo Executivo, Tema Principal, Tema Reserva, Distribuição, Impacto no Funil).
+Antes de criar:
+1) Ler contexto atual do pipeline e pendências comerciais.
+2) Evitar repetir tema recente.
+3) Escolher 1 tema com score >= 7.
 
-Critérios:
-- Nada genérico
-- CTA comercial claro
-- Foco em geração de leads hoje
-- Priorize score >= 7
+Agora entregue APENAS este output:
+1) 3 prompts bem criativos para thumbnail
+2) 3 títulos que combinem com os thumbnails
+3) descrição completa do vídeo com link comercial de WhatsApp (wa.me)
+4) briefing completo do vídeo incluindo materiais para apresentar e formato webcam + tela no OBS
+
+Restrições:
+- Não incluir blocos extras
+- Não ser genérico
+- Linguagem direta e prática
+- Foco em conversão real
 """
