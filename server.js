@@ -10,6 +10,7 @@ const DATA_FILE = process.env.BOARD_DATA_FILE || path.join(__dirname, 'data', 'b
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
 const PAGES_DIR = process.env.PAGES_DIR || path.join(__dirname, 'data', 'pages');
 const PAGES_INDEX_FILE = path.join(PAGES_DIR, 'index.json');
+const INBOX_FILE = process.env.INBOX_FILE || path.join(__dirname, 'data', 'inbox.json');
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -63,6 +64,22 @@ function ensurePages() {
   if (!fs.existsSync(defaultPageFile)) {
     fs.writeFileSync(defaultPageFile, JSON.stringify(createDefaultBoard(), null, 2));
   }
+}
+
+function ensureInboxFile() {
+  const dir = path.dirname(INBOX_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(INBOX_FILE)) fs.writeFileSync(INBOX_FILE, JSON.stringify([], null, 2));
+}
+
+function readInbox() {
+  ensureInboxFile();
+  return JSON.parse(fs.readFileSync(INBOX_FILE, 'utf8'));
+}
+
+function writeInbox(items) {
+  ensureInboxFile();
+  fs.writeFileSync(INBOX_FILE, JSON.stringify(items, null, 2));
 }
 
 function readBoard() {
@@ -163,6 +180,51 @@ app.patch('/api/cards/:id', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Inbox webhook para receber tarefas/informações externas
+app.get('/api/inbox', auth, (_, res) => {
+  const items = readInbox();
+  res.json({ ok: true, count: items.length, items: items.slice(-100).reverse() });
+});
+
+app.post('/api/inbox', auth, (req, res) => {
+  const body = req.body || {};
+  const text = String(body.text || body.title || '').trim();
+  if (!text) return res.status(400).json({ ok: false, error: 'text/title obrigatório' });
+
+  const item = {
+    id: `inbox-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    source: String(body.source || 'webhook'),
+    type: String(body.type || 'task'),
+    title: text,
+    notes: String(body.notes || ''),
+    owner: String(body.owner || 'Diego'),
+    priority: String(body.priority || 'p1').toLowerCase(),
+    due: body.due || null,
+    tags: Array.isArray(body.tags) ? body.tags : ['webhook', 'manual']
+  };
+
+  const items = readInbox();
+  items.push(item);
+  writeInbox(items);
+
+  const board = readBoard();
+  const columnId = ['p0', 'p1', 'p2', 'p3', 'doing', 'done'].includes(item.priority) ? item.priority : 'p1';
+  board.cards.push({
+    id: item.id,
+    columnId,
+    title: item.title,
+    notes: item.notes,
+    owner: item.owner,
+    priority: item.priority,
+    due: item.due,
+    tags: item.tags
+  });
+  writeBoard(board);
+
+  res.json({ ok: true, id: item.id, columnId });
+});
+
 // Pages API (subpáginas infinitas)
 app.get('/api/pages', (_, res) => {
   const pages = readPagesIndex();
@@ -211,7 +273,11 @@ app.post('/api/pages/:slug', auth, (req, res) => {
 app.get('/api/config', (_, res) => {
   res.json({
     publicUrl: PUBLIC_URL,
-    hasApiKey: Boolean(UPDATE_API_KEY)
+    hasApiKey: Boolean(UPDATE_API_KEY),
+    webhook: {
+      inboxPost: '/api/inbox',
+      inboxGet: '/api/inbox'
+    }
   });
 });
 
@@ -222,5 +288,6 @@ app.get('/p/:slug', (_, res) => {
 app.listen(PORT, () => {
   ensureDataFile();
   ensurePages();
+  ensureInboxFile();
   console.log(`Sala de Guerra rodando na porta ${PORT}`);
 });
