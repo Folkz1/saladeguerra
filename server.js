@@ -9,6 +9,9 @@ const UPDATE_API_KEY = process.env.UPDATE_API_KEY || '';
 const EVOLUTION_WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || '';
 const OPENROUTER_API_KEY = process.env.API_OPENROUTER || '';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
+const NOTION_API_KEY = process.env.NOTION_API_KEY || '';
+const NOTION_DB_ID = process.env.NOTION_DB_ID || '';
+const NOTION_VERSION = process.env.NOTION_VERSION || '2022-06-28';
 
 const DATA_FILE = process.env.BOARD_DATA_FILE || path.join(__dirname, 'data', 'board.json');
 const PUBLIC_URL = process.env.PUBLIC_URL || '';
@@ -290,6 +293,104 @@ function dedupeCardIndex(cards, contactId, intent, title) {
   });
 }
 
+let notionSyncState = { running: false, lastRunAt: null, lastResult: null };
+
+function notionEnabled() {
+  return Boolean(NOTION_API_KEY && NOTION_DB_ID);
+}
+
+async function notionRequest(path, method = 'GET', body) {
+  const resp = await fetch(`https://api.notion.com/v1${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${NOTION_API_KEY}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const text = await resp.text();
+  let json = {};
+  try { json = JSON.parse(text); } catch { json = { raw: text }; }
+  if (!resp.ok) throw new Error(`${method} ${path} -> ${resp.status} ${text}`);
+  return json;
+}
+
+function notionRichText(text) {
+  return [{ type: 'text', text: { content: String(text || '').slice(0, 1800) } }];
+}
+
+async function syncBoardToNotion(boardInput) {
+  if (!notionEnabled()) return { ok: false, skipped: true, reason: 'notion env missing' };
+  if (notionSyncState.running) return { ok: true, skipped: true, reason: 'sync already running' };
+
+  notionSyncState.running = true;
+  try {
+    const board = boardInput || readBoard();
+    const cards = Array.isArray(board.cards) ? board.cards : [];
+
+    const existing = new Map();
+    let cursor;
+    do {
+      const q = await notionRequest(`/databases/${NOTION_DB_ID}/query`, 'POST', {
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {})
+      });
+      for (const row of (q.results || [])) {
+        const cid = row.properties?.['Card ID']?.rich_text?.[0]?.plain_text;
+        if (cid) existing.set(cid, row.id);
+      }
+      cursor = q.has_more ? q.next_cursor : null;
+    } while (cursor);
+
+    let created = 0;
+    let updated = 0;
+
+    for (const c of cards.slice(0, 500)) {
+      const rawStatus = String(c.columnId || c.priority || 'p1').toLowerCase();
+      const status = ['p0', 'p1', 'p2', 'p3', 'doing', 'done'].includes(rawStatus) ? rawStatus : normalizePriority(rawStatus);
+      const props = {
+        'Task': { title: notionRichText(c.title || 'Sem título') },
+        'Card ID': { rich_text: notionRichText(c.id || '') },
+        'Status': { select: { name: ['p0', 'p1', 'p2', 'p3', 'doing', 'done'].includes(status) ? status : 'p1' } },
+        'Owner': { rich_text: notionRichText(c.owner || 'Diego') },
+        'Due': c.due || c.prazo ? { date: { start: new Date(c.due || c.prazo).toISOString() } } : { date: null },
+        'Impact R$': { rich_text: notionRichText(c['impactR$'] || '') },
+        'Tags': { multi_select: (c.tags || []).slice(0, 10).map((t) => ({ name: String(t).slice(0, 100) })) },
+        'Source': { url: `${PUBLIC_URL || ''}/` || null },
+        'Updated At': { date: { start: new Date(c.updatedAt || board.meta?.updatedAt || Date.now()).toISOString() } }
+      };
+
+      const rowId = existing.get(c.id);
+      if (rowId) {
+        await notionRequest(`/pages/${rowId}`, 'PATCH', { properties: props });
+        updated++;
+      } else {
+        await notionRequest('/pages', 'POST', {
+          parent: { database_id: NOTION_DB_ID },
+          properties: props,
+          children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: notionRichText(c.summary || c.notes || '') } }]
+        });
+        created++;
+      }
+    }
+
+    notionSyncState.lastRunAt = new Date().toISOString();
+    notionSyncState.lastResult = { ok: true, total: cards.length, created, updated };
+    return notionSyncState.lastResult;
+  } finally {
+    notionSyncState.running = false;
+  }
+}
+
+function triggerNotionSync(boardInput) {
+  if (!notionEnabled()) return;
+  syncBoardToNotion(boardInput).catch((err) => {
+    notionSyncState.lastRunAt = new Date().toISOString();
+    notionSyncState.lastResult = { ok: false, error: String(err.message || err) };
+  });
+}
+
 function addTasksToBoardFromAnalysis(analysis, sourceEvent) {
   if (!analysis?.ok || !analysis?.data?.tasks || !Array.isArray(analysis.data.tasks)) return [];
 
@@ -371,7 +472,8 @@ app.post('/api/board', auth, (req, res) => {
     return res.status(400).json({ ok: false, error: 'payload inválido' });
   }
   writeBoard(board);
-  res.json({ ok: true, updatedAt: new Date().toISOString() });
+  triggerNotionSync(board);
+  res.json({ ok: true, updatedAt: new Date().toISOString(), notionSyncTriggered: notionEnabled() });
 });
 
 app.post('/api/cards', auth, (req, res) => {
@@ -514,6 +616,24 @@ app.get('/api/evolution/events', auth, (req, res) => {
   res.json({ ok: true, count: items.length, items });
 });
 
+app.post('/api/notion/sync', auth, async (_, res) => {
+  try {
+    const result = await syncBoardToNotion(readBoard());
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error.message || error) });
+  }
+});
+
+app.get('/api/notion/sync/status', auth, (_, res) => {
+  res.json({
+    ok: true,
+    enabled: notionEnabled(),
+    dbId: notionEnabled() ? NOTION_DB_ID : null,
+    state: notionSyncState
+  });
+});
+
 // Pages API (subpáginas infinitas)
 app.get('/api/pages', (_, res) => {
   const pages = readPagesIndex();
@@ -564,12 +684,18 @@ app.get('/api/config', (_, res) => {
     publicUrl: PUBLIC_URL,
     hasApiKey: Boolean(UPDATE_API_KEY),
     hasOpenRouter: Boolean(OPENROUTER_API_KEY),
+    hasNotion: notionEnabled(),
     webhook: {
       inboxPost: '/api/inbox',
       inboxGet: '/api/inbox',
       evolutionWebhookPost: '/api/evolution/webhook',
       evolutionEventsGet: '/api/evolution/events',
       autoTaskModeDefault: false
+    },
+    sync: {
+      notionSyncPost: '/api/notion/sync',
+      notionSyncStatusGet: '/api/notion/sync/status',
+      notionIntervalMinutes: 30
     }
   });
 });
@@ -583,5 +709,11 @@ app.listen(PORT, () => {
   ensurePages();
   ensureInboxFile();
   ensureEventsFile();
+
+  if (notionEnabled()) {
+    setInterval(() => triggerNotionSync(readBoard()), 30 * 60 * 1000);
+    triggerNotionSync(readBoard());
+  }
+
   console.log(`Sala de Guerra rodando na porta ${PORT}`);
 });
