@@ -45,6 +45,32 @@
     <section id="board" class="board"></section>
   </main>
 
+  <aside id="taskDrawer" class="drawer hidden" aria-hidden="true">
+    <div class="drawer-head">
+      <strong id="drawerTitle">Tarefa</strong>
+      <button id="drawerClose" type="button">Fechar</button>
+    </div>
+    <div class="drawer-body">
+      <p id="drawerSummary"></p>
+      <div id="drawerMeta" class="drawer-meta"></div>
+
+      <h4>Próximo passo</h4>
+      <p id="drawerNext"></p>
+
+      <h4>DoD</h4>
+      <p id="drawerDod"></p>
+
+      <h4>Risco</h4>
+      <p id="drawerRisk"></p>
+
+      <h4>Materiais / Referências</h4>
+      <ul id="drawerRefs"></ul>
+
+      <h4>Contexto completo</h4>
+      <pre id="drawerContext"></pre>
+    </div>
+  </aside>
+
   <footer>
     <small>Kanban Profissional • Atualização via API • Subpáginas: /p/&lt;slug&gt;</small>
   </footer>

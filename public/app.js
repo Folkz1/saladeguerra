@@ -8,7 +8,8 @@ const state = {
   query: '',
   owner: '',
   priority: '',
-  view: 'kanban'
+  view: 'kanban',
+  selectedId: null
 };
 
 function norm(v) {
@@ -229,6 +230,74 @@ function getCardsByColumn(filteredCards, colId) {
   });
 }
 
+function collectReferences(card) {
+  const refs = [];
+  const fromFields = [];
+  if (Array.isArray(card.references)) fromFields.push(...card.references);
+  if (Array.isArray(card.materials)) fromFields.push(...card.materials);
+  if (typeof card.references === 'string') fromFields.push(card.references);
+  if (typeof card.materials === 'string') fromFields.push(card.materials);
+
+  fromFields.forEach((r) => {
+    const s = String(r || '').trim();
+    if (s) refs.push(s);
+  });
+
+  const raw = `${card.fullContext || ''} ${card.notes || ''} ${card.summary || ''}`;
+  const urls = raw.match(/https?:\/\/[^\s)]+/g) || [];
+  urls.forEach((u) => refs.push(u));
+
+  return [...new Set(refs)].slice(0, 30);
+}
+
+function openDrawer(card) {
+  state.selectedId = card.id;
+  const drawer = document.getElementById('taskDrawer');
+  drawer.classList.remove('hidden');
+  drawer.setAttribute('aria-hidden', 'false');
+
+  document.getElementById('drawerTitle').textContent = card.title || 'Tarefa';
+  document.getElementById('drawerSummary').textContent = card.summary || card.notes || '';
+
+  const meta = [];
+  meta.push(`<span class="badge ${esc(toPriority(card.priority || card.columnId))}">${esc(String(card.priority || card.columnId || '').toUpperCase())}</span>`);
+  if (card.owner) meta.push(`<span class="badge owner">${esc(card.owner)}</span>`);
+  if (card.due || card.prazo) meta.push(`<span class="badge due ${isOverdue(card.due || card.prazo) ? 'overdue' : ''}">prazo: ${esc(formatDue(card.due || card.prazo))}</span>`);
+  if (card['impactR$']) meta.push(`<span class="badge">impacto: ${esc(card['impactR$'])}</span>`);
+  (card.tags || []).forEach((t) => meta.push(`<span class="badge">${esc(t)}</span>`));
+  document.getElementById('drawerMeta').innerHTML = meta.join(' ');
+
+  document.getElementById('drawerNext').textContent = card.proximo_passo || '-';
+  document.getElementById('drawerDod').textContent = card.DoD || '-';
+  document.getElementById('drawerRisk').textContent = card.risco || '-';
+
+  const refs = collectReferences(card);
+  const refsEl = document.getElementById('drawerRefs');
+  refsEl.innerHTML = '';
+  if (refs.length === 0) {
+    refsEl.innerHTML = '<li>Sem referência cadastrada.</li>';
+  } else {
+    refs.forEach((r) => {
+      const li = document.createElement('li');
+      if (/^https?:\/\//i.test(r)) {
+        li.innerHTML = `<a href="${esc(r)}" target="_blank" rel="noreferrer">${esc(r)}</a>`;
+      } else {
+        li.textContent = r;
+      }
+      refsEl.appendChild(li);
+    });
+  }
+
+  document.getElementById('drawerContext').textContent = card.fullContext || card.notes || card.summary || '-';
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById('taskDrawer');
+  drawer.classList.add('hidden');
+  drawer.setAttribute('aria-hidden', 'true');
+  state.selectedId = null;
+}
+
 function createCardElement(c) {
   const priority = toPriority(c.priority || c.P || c.columnId);
   const priorityLabel = priority.toUpperCase();
@@ -245,6 +314,7 @@ function createCardElement(c) {
 
   const card = document.createElement('article');
   card.className = 'card';
+  card.setAttribute('data-cardid', String(c.id || ''));
   card.innerHTML = `
     <div class="title">${esc(c.title || 'Sem título')}</div>
     <div class="notes">${notes}</div>
@@ -266,22 +336,30 @@ function createCardElement(c) {
 
 async function onCardAction(ev) {
   const btn = ev.target.closest('button[data-act]');
-  if (!btn) return;
-  const id = btn.getAttribute('data-id');
-  const act = btn.getAttribute('data-act');
-  if (!id || !act) return;
+  if (btn) {
+    const id = btn.getAttribute('data-id');
+    const act = btn.getAttribute('data-act');
+    if (!id || !act) return;
 
-  const idx = (state.board.cards || []).findIndex(c => String(c.id) === String(id));
-  if (idx === -1) return;
+    const idx = (state.board.cards || []).findIndex(c => String(c.id) === String(id));
+    if (idx === -1) return;
 
-  const patch = { columnId: act === 'done' ? 'done' : 'doing' };
-  try {
-    await patchCard(id, patch);
-    state.board.cards[idx] = { ...state.board.cards[idx], ...patch };
-    renderBoard(state.board);
-  } catch (err) {
-    alert(err.message);
+    const patch = { columnId: act === 'done' ? 'done' : 'doing' };
+    try {
+      await patchCard(id, patch);
+      state.board.cards[idx] = { ...state.board.cards[idx], ...patch };
+      renderBoard(state.board);
+    } catch (err) {
+      alert(err.message);
+    }
+    return;
   }
+
+  const cardEl = ev.target.closest('[data-cardid]');
+  if (!cardEl) return;
+  const cardId = cardEl.getAttribute('data-cardid');
+  const card = (state.board.cards || []).find(c => String(c.id) === String(cardId));
+  if (card) openDrawer(card);
 }
 
 function renderBoard(board) {
@@ -347,6 +425,11 @@ function bindFilters() {
     [...document.querySelectorAll('#views button')].forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderBoard(state.board);
+  });
+
+  document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeDrawer();
   });
 }
 
