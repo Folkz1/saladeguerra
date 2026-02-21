@@ -484,16 +484,21 @@ app.post('/api/evolution/webhook', authEvolutionWebhook, async (req, res) => {
   try {
     const eventItem = normalizeInbound(req.body || {});
     const analysis = await analyzeWithOpenRouter(eventItem);
-    const createdCardIds = addTasksToBoardFromAnalysis(analysis, eventItem);
+
+    // Segurança operacional: NÃO criar tasks automaticamente por padrão.
+    // Só cria se explicitamente solicitado com autoTasks=true
+    const autoTasks = String(req.query.autoTasks || req.body?.autoTasks || '').toLowerCase() === 'true';
+    const createdCardIds = autoTasks ? addTasksToBoardFromAnalysis(analysis, eventItem) : [];
 
     const record = {
       ...eventItem,
       analysis,
+      autoTasks,
       createdCardIds
     };
 
     appendEvent(record);
-    res.json({ ok: true, eventId: eventItem.id, createdCardIds, analyzed: Boolean(analysis?.ok) });
+    res.json({ ok: true, eventId: eventItem.id, autoTasks, createdCardIds, analyzed: Boolean(analysis?.ok) });
   } catch (error) {
     res.status(500).json({ ok: false, error: String(error.message || error) });
   }
@@ -563,7 +568,8 @@ app.get('/api/config', (_, res) => {
       inboxPost: '/api/inbox',
       inboxGet: '/api/inbox',
       evolutionWebhookPost: '/api/evolution/webhook',
-      evolutionEventsGet: '/api/evolution/events'
+      evolutionEventsGet: '/api/evolution/events',
+      autoTaskModeDefault: false
     }
   });
 });
