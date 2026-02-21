@@ -191,12 +191,14 @@ function detectMedia(payload) {
 function normalizeInbound(payload) {
   const key = payload?.data?.key || payload?.key || {};
   const media = detectMedia(payload);
+  const remoteJid = key.remoteJid || payload?.data?.remoteJid || null;
   return {
     id: key.id || payload?.event || `evt-${Date.now()}`,
     createdAt: new Date().toISOString(),
     event: payload?.event || payload?.type || 'unknown',
     instance: payload?.instance || payload?.instanceName || payload?.data?.instance || null,
-    remoteJid: key.remoteJid || payload?.data?.remoteJid || null,
+    remoteJid,
+    contactId: remoteJid,
     fromMe: Boolean(key.fromMe),
     pushName: payload?.data?.pushName || payload?.pushName || null,
     text: String(getTextMessage(payload) || ''),
@@ -250,32 +252,114 @@ async function analyzeWithOpenRouter(eventItem) {
   }
 }
 
+function compactText(text, max = 280) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return { summary: clean, fullContext: '' };
+  return { summary: `${clean.slice(0, max - 1)}…`, fullContext: clean };
+}
+
+function normalizePriority(v) {
+  const p = String(v || '').toLowerCase();
+  if (['p0', 'alta', 'high', 'urgent'].includes(p)) return 'p0';
+  if (['p1', 'media', 'média', 'medium'].includes(p)) return 'p1';
+  if (['p2', 'baixa', 'low'].includes(p)) return 'p2';
+  if (['p3'].includes(p)) return 'p3';
+  return p.startsWith('p') ? p : 'p1';
+}
+
+function inferIntent(title, summary) {
+  const t = `${title || ''} ${summary || ''}`.toLowerCase();
+  if (t.includes('responder') || t.includes('follow-up') || t.includes('follow up')) return 'followup';
+  if (t.includes('proposta') || t.includes('orçamento') || t.includes('orcamento')) return 'proposal';
+  if (t.includes('call') || t.includes('reunião') || t.includes('reuniao')) return 'meeting';
+  if (t.includes('conteúdo') || t.includes('conteudo') || t.includes('youtube') || t.includes('vídeo') || t.includes('video')) return 'content';
+  return 'general';
+}
+
+function dedupeCardIndex(cards, contactId, intent, title) {
+  const titleNorm = String(title || '').toLowerCase().slice(0, 80);
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  return cards.findIndex((c) => {
+    const sameContact = String(c.contactId || '') === String(contactId || '');
+    const sameIntent = String(c.intent || '') === String(intent || '');
+    const sameAuto = Array.isArray(c.tags) && c.tags.includes('autosync');
+    const recent = !c.updatedAt || (now - new Date(c.updatedAt).getTime() <= dayMs);
+    const similarTitle = String(c.title || '').toLowerCase().includes(titleNorm) || titleNorm.includes(String(c.title || '').toLowerCase());
+    return sameAuto && sameContact && sameIntent && recent && similarTitle;
+  });
+}
+
 function addTasksToBoardFromAnalysis(analysis, sourceEvent) {
   if (!analysis?.ok || !analysis?.data?.tasks || !Array.isArray(analysis.data.tasks)) return [];
 
   const board = readBoard();
-  const created = [];
+  const createdOrUpdated = [];
+
   for (const task of analysis.data.tasks.slice(0, 5)) {
-    const id = `evt-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const priority = String(analysis.data.suggestedPriority || 'p1').toLowerCase();
+    const priority = normalizePriority(task.priority || analysis.data.suggestedPriority || 'p1');
     const columnId = ['p0', 'p1', 'p2', 'p3'].includes(priority) ? priority : 'p1';
 
+    const baseReason = String(task.reason || analysis.data.summary || sourceEvent.text || '');
+    const { summary, fullContext } = compactText(baseReason, 280);
+    const title = String(task.title || 'Novo item do webhook');
+    const intent = inferIntent(title, summary);
+    const due = task.dueHint || null;
+    const impact = String(task.impactR$ || task.impactRs || '');
+
+    const idx = dedupeCardIndex(board.cards || [], sourceEvent.contactId, intent, title);
+
+    if (idx >= 0) {
+      board.cards[idx] = {
+        ...board.cards[idx],
+        columnId,
+        title,
+        summary,
+        notes: summary,
+        fullContext: fullContext || board.cards[idx].fullContext || '',
+        owner: String(task.owner || board.cards[idx].owner || 'Diego'),
+        priority,
+        due,
+        DoD: String(task.dod || board.cards[idx].DoD || 'Resposta enviada + próximo passo definido.'),
+        proximo_passo: String(task.nextStep || task.next || board.cards[idx].proximo_passo || 'Executar próximo passo e atualizar status.'),
+        risco: String(task.risk || board.cards[idx].risco || 'Risco não mapeado'),
+        impactR$: impact || board.cards[idx]['impactR$'] || '',
+        tags: Array.from(new Set([...(board.cards[idx].tags || []), 'autosync', 'whatsapp', 'war-room', 'manual-review'])),
+        sourceEventId: sourceEvent.id,
+        contactId: sourceEvent.contactId,
+        intent,
+        updatedAt: new Date().toISOString()
+      };
+      createdOrUpdated.push(board.cards[idx].id);
+      continue;
+    }
+
+    const id = `evt-task-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     board.cards.push({
       id,
       columnId,
-      title: String(task.title || 'Novo item do webhook'),
-      notes: String(task.reason || analysis.data.summary || '').slice(0, 1200),
+      title,
+      summary,
+      notes: summary,
+      fullContext,
       owner: String(task.owner || 'Diego'),
       priority,
-      due: task.dueHint || null,
-      tags: ['evolution', 'ai', 'autosync', 'manual-review'],
-      sourceEventId: sourceEvent.id
+      due,
+      'impactR$': impact,
+      DoD: String(task.dod || 'Resposta enviada + próximo passo definido.'),
+      proximo_passo: String(task.nextStep || task.next || 'Executar próximo passo e atualizar status.'),
+      risco: String(task.risk || 'Risco não mapeado'),
+      tags: ['evolution', 'ai', 'autosync', 'manual-review', 'whatsapp', 'war-room'],
+      sourceEventId: sourceEvent.id,
+      contactId: sourceEvent.contactId,
+      intent,
+      updatedAt: new Date().toISOString()
     });
-    created.push(id);
+    createdOrUpdated.push(id);
   }
 
-  if (created.length) writeBoard(board);
-  return created;
+  if (createdOrUpdated.length) writeBoard(board);
+  return createdOrUpdated;
 }
 
 app.get('/health', (_, res) => res.json({ ok: true, service: 'saladeguerra-mvp' }));
@@ -295,15 +379,23 @@ app.post('/api/cards', auth, (req, res) => {
   const card = req.body || {};
   if (!card.title || !card.columnId) return res.status(400).json({ ok: false, error: 'title e columnId obrigatórios' });
   const id = `card-${Date.now()}`;
+  const compact = compactText(String(card.notes || card.summary || card.title), 280);
   board.cards.push({
     id,
     title: card.title,
     columnId: card.columnId,
-    notes: card.notes || '',
+    summary: compact.summary,
+    notes: compact.summary,
+    fullContext: compact.fullContext,
     owner: card.owner || '',
-    priority: card.priority || 'p1',
+    priority: normalizePriority(card.priority || 'p1'),
     due: card.due || null,
-    tags: Array.isArray(card.tags) ? card.tags : []
+    'impactR$': card['impactR$'] || '',
+    DoD: card.DoD || '',
+    proximo_passo: card.proximo_passo || '',
+    risco: card.risco || '',
+    tags: Array.isArray(card.tags) ? card.tags : [],
+    updatedAt: new Date().toISOString()
   });
   writeBoard(board);
   res.json({ ok: true, id });
@@ -313,9 +405,19 @@ app.patch('/api/cards/:id', auth, (req, res) => {
   const board = readBoard();
   const idx = board.cards.findIndex(c => c.id === req.params.id);
   if (idx === -1) return res.status(404).json({ ok: false, error: 'card não encontrado' });
-  board.cards[idx] = { ...board.cards[idx], ...req.body };
+
+  const patch = { ...req.body };
+  if (patch.priority) patch.priority = normalizePriority(patch.priority);
+  if (patch.notes || patch.summary) {
+    const compact = compactText(String(patch.summary || patch.notes || ''), 280);
+    patch.summary = compact.summary;
+    patch.notes = compact.summary;
+    if (compact.fullContext) patch.fullContext = compact.fullContext;
+  }
+
+  board.cards[idx] = { ...board.cards[idx], ...patch, updatedAt: new Date().toISOString() };
   writeBoard(board);
-  res.json({ ok: true });
+  res.json({ ok: true, card: board.cards[idx] });
 });
 
 // Inbox webhook para receber tarefas/informações externas
@@ -329,16 +431,23 @@ app.post('/api/inbox', auth, (req, res) => {
   const text = String(body.text || body.title || '').trim();
   if (!text) return res.status(400).json({ ok: false, error: 'text/title obrigatório' });
 
+  const compact = compactText(String(body.notes || text), 280);
   const item = {
     id: `inbox-${Date.now()}`,
     createdAt: new Date().toISOString(),
     source: String(body.source || 'webhook'),
     type: String(body.type || 'task'),
     title: text,
+    summary: compact.summary,
+    fullContext: compact.fullContext,
     notes: String(body.notes || ''),
     owner: String(body.owner || 'Diego'),
-    priority: String(body.priority || 'p1').toLowerCase(),
+    priority: normalizePriority(body.priority || 'p1'),
     due: body.due || null,
+    'impactR$': String(body['impactR$'] || body.impactRs || body.impact || ''),
+    DoD: String(body.dod || body.DoD || ''),
+    proximo_passo: String(body.nextStep || body.proximo_passo || ''),
+    risco: String(body.risk || body.risco || ''),
     tags: Array.isArray(body.tags) ? body.tags : ['webhook', 'manual']
   };
 
@@ -352,11 +461,18 @@ app.post('/api/inbox', auth, (req, res) => {
     id: item.id,
     columnId,
     title: item.title,
-    notes: item.notes,
+    summary: item.summary,
+    notes: item.summary,
+    fullContext: item.fullContext,
     owner: item.owner,
     priority: item.priority,
     due: item.due,
-    tags: item.tags
+    'impactR$': item['impactR$'],
+    DoD: item.DoD,
+    proximo_passo: item.proximo_passo,
+    risco: item.risco,
+    tags: item.tags,
+    updatedAt: new Date().toISOString()
   });
   writeBoard(board);
 
