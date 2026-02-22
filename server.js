@@ -700,6 +700,10 @@ app.get('/api/config', (_, res) => {
   });
 });
 
+app.get('/licitaai', (_, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'licitaai.html'));
+});
+
 app.get('/p/:slug', (_, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
