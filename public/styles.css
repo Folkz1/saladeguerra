@@ -65,6 +65,26 @@ footer { padding: 8px 16px 16px; color: #7384a9; }
 .drawer-meta { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
 .drawer pre { white-space: pre-wrap; background:#101a34; border:1px solid #24365f; border-radius:8px; padding:10px; color:#cfe0ff; }
 .drawer a { color:#9dc1ff; word-break: break-all; }
+.drawer-comments { margin: 0; padding-left: 18px; color: #d9e5ff; }
+.drawer-comments li { margin-bottom: 8px; font-size: 13px; line-height: 1.4; }
+.comment-form { display: grid; gap: 8px; margin-top: 8px; }
+.comment-form input, .comment-form textarea {
+  background: #101a34;
+  border: 1px solid #2b3f6f;
+  color: #d9e5ff;
+  border-radius: 8px;
+  padding: 8px;
+  font: inherit;
+}
+.comment-form button {
+  justify-self: start;
+  background:#1e315f;
+  color:#dbe7ff;
+  border:1px solid #34508d;
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+}
 
 @media (max-width: 1200px) { .board { grid-template-columns: repeat(2, minmax(220px, 1fr)); } .kpis { grid-template-columns: repeat(2, minmax(140px, 1fr)); } }
 @media (max-width: 680px) { .toolbar { grid-template-columns: 1fr; } .board { grid-template-columns: 1fr; } .kpis { grid-template-columns: 1fr 1fr; } }

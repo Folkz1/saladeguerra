@@ -113,6 +113,29 @@ async function patchCard(cardId, patch) {
   return res.json();
 }
 
+async function addComment(cardId, text, author) {
+  const res = await fetch('/api/cards/' + encodeURIComponent(cardId) + '/comments', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': localStorage.getItem('war_api_key') || ''
+    },
+    body: JSON.stringify({ text, author })
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      const key = prompt('Digite sua UPDATE_API_KEY para comentar:');
+      if (!key) throw new Error('Sem chave para comentar');
+      localStorage.setItem('war_api_key', key);
+      return addComment(cardId, text, author);
+    }
+    throw new Error(await res.text());
+  }
+
+  return res.json();
+}
+
 async function renderPagesNav() {
   try {
     const res = await fetch('/api/pages');
@@ -250,6 +273,24 @@ function collectReferences(card) {
   return [...new Set(refs)].slice(0, 30);
 }
 
+function renderComments(card) {
+  const root = document.getElementById('drawerComments');
+  root.innerHTML = '';
+  const comments = Array.isArray(card.comments) ? card.comments : [];
+
+  if (!comments.length) {
+    root.innerHTML = '<li>Sem comentários ainda.</li>';
+    return;
+  }
+
+  [...comments].slice(-20).reverse().forEach((c) => {
+    const li = document.createElement('li');
+    const when = formatDue(c.createdAt);
+    li.innerHTML = `<strong>${esc(c.author || 'Diego')}</strong> <small>${esc(when)}</small><br>${esc(c.text || '')}`;
+    root.appendChild(li);
+  });
+}
+
 function openDrawer(card) {
   state.selectedId = card.id;
   const drawer = document.getElementById('taskDrawer');
@@ -289,6 +330,14 @@ function openDrawer(card) {
   }
 
   document.getElementById('drawerContext').textContent = card.fullContext || card.notes || card.summary || '-';
+  renderComments(card);
+
+  const authorInput = document.getElementById('commentAuthor');
+  if (authorInput && !authorInput.value) {
+    authorInput.value = localStorage.getItem('war_comment_author') || 'Diego';
+  }
+  const textInput = document.getElementById('commentText');
+  if (textInput) textInput.value = '';
 }
 
 function closeDrawer() {
@@ -428,6 +477,28 @@ function bindFilters() {
   });
 
   document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+  const form = document.getElementById('commentForm');
+  if (form) {
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!state.selectedId) return;
+      const author = document.getElementById('commentAuthor').value.trim() || 'Diego';
+      const text = document.getElementById('commentText').value.trim();
+      if (!text) return;
+      localStorage.setItem('war_comment_author', author);
+
+      try {
+        const out = await addComment(state.selectedId, text, author);
+        const idx = (state.board.cards || []).findIndex(c => String(c.id) === String(state.selectedId));
+        if (idx >= 0) state.board.cards[idx] = out.card;
+        openDrawer(out.card);
+        renderBoard(state.board);
+      } catch (err) {
+        alert(`Falha ao comentar: ${err.message}`);
+      }
+    });
+  }
+
   window.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') closeDrawer();
   });
