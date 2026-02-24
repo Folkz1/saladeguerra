@@ -79,6 +79,14 @@ curl -X POST "https://SEU-LINK/api/board" \
 ### Atualizar card
 `PATCH /api/cards/:id` com `x-api-key`
 
+### Comentar em card
+`POST /api/cards/:id/comments` com `x-api-key`
+
+Payload:
+```json
+{ "author": "Diego", "text": "DECISÃO: focar P0 comercial até 12:00" }
+```
+
 ## Deploy EasyPanel
 
 - Runtime: Node.js
@@ -86,6 +94,7 @@ curl -X POST "https://SEU-LINK/api/board" \
 - Start command: `npm start`
 - Expor porta `3000`
 - Persistência: monte volume para pasta `data/` (para não perder board ao redeploy)
+- Notion: configure `NOTION_API_KEY` + `NOTION_DB_ID`; ao subir/redeploy o serviço já dispara sync inicial e segue sincronizando periodicamente (30 min) + a cada atualização de card/board.
 
 ---
 

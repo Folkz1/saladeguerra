@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Sala de Guerra — Motor 100k",
-    "updatedAt": "2026-02-20T01:40:22.288Z",
+    "updatedAt": "2026-02-22T00:01:13.851Z",
     "target": 100000,
     "closedRevenue": 0
   },
@@ -39,6 +39,41 @@
       "tags": [
         "motor100k"
       ]
+    },
+    {
+      "id": "inbox-1771702880577",
+      "columnId": "doing",
+      "title": "Fechar roteiro youtube ALICE",
+      "summary": "Criar 3 hooks e CTA whatsapp. Detalhe extra muito longo para testar compactacao.................................................................................",
+      "notes": "Criar 3 hooks e CTA whatsapp. Detalhe extra muito longo para testar compactacao.................................................................................",
+      "fullContext": "",
+      "owner": "Diego",
+      "priority": "p0",
+      "due": null,
+      "impactR$": "R$5000",
+      "DoD": "",
+      "proximo_passo": "",
+      "risco": "",
+      "tags": [
+        "youtube",
+        "manual"
+      ],
+      "updatedAt": "2026-02-21T19:41:26.095Z"
+    },
+    {
+      "id": "card-eod-1771718473921",
+      "columnId": "p1",
+      "title": "EOD: Executar Top 5 de amanhã",
+      "summary": "Plano gerado no inbox (type=eod).",
+      "notes": "EOD 21:00 — Evolution + War Room\n\nAbertos por frente:\n- Comercial (1): Definir 3 ações de caixa para hoje\n- YouTube (1): Fechar roteiro youtube ALICE\n- Operação (0): —\n\nTop 5 para amanhã (P0/P1):\n1. [ALTA] Definir 3 ações de caixa para hoje\n2. [P0] Fechar roteiro youtube ALICE\n\n3 primeiras ações da manhã:\n1) 08:30 priorizar e destravar 1 item P0 de Comercial (definir dono + prazo).\n2) 08:50 fechar roteiro YouTube ALICE (hooks + CTA WhatsApp) e mover para doing.\n3) 09:20 revisar board, atualizar próximos passos e impactoR$ faltante.\n\nR$ em jogo estimado (abertos): R$5.000.",
+      "owner": "Diego",
+      "priority": "p1",
+      "tags": [
+        "eod",
+        "war-room"
+      ],
+      "impactR$": "R$5.000",
+      "updatedAt": "2026-02-22T00:01:13.851Z"
     }
   ]
 }

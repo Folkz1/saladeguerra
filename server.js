@@ -320,6 +320,53 @@ function notionRichText(text) {
   return [{ type: 'text', text: { content: String(text || '').slice(0, 1800) } }];
 }
 
+function normalizeComments(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((c) => ({
+      id: c.id || `c-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      author: String(c.author || 'Diego').slice(0, 80),
+      text: String(c.text || '').trim(),
+      createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString()
+    }))
+    .filter((c) => c.text)
+    .slice(-100);
+}
+
+function latestCommentLine(card) {
+  const comments = normalizeComments(card?.comments || []);
+  if (!comments.length) return '';
+  const c = comments[comments.length - 1];
+  return `${c.createdAt} — ${c.author}: ${c.text}`.slice(0, 1800);
+}
+
+async function syncLatestCommentToNotion(pageId, card) {
+  const latest = latestCommentLine(card);
+  if (!latest) return { ok: true, skipped: true, reason: 'no comments' };
+
+  const children = await notionRequest(`/blocks/${pageId}/children?page_size=20`, 'GET');
+  const blocks = children?.results || [];
+  const already = blocks.some((b) => {
+    const txt = b?.paragraph?.rich_text?.map((t) => t?.plain_text || '').join('') || '';
+    return txt.startsWith('Último comentário:') && txt.includes(latest);
+  });
+  if (already) return { ok: true, skipped: true, reason: 'latest already synced' };
+
+  await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+    children: [
+      {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: notionRichText(`Último comentário: ${latest}`)
+        }
+      }
+    ]
+  });
+
+  return { ok: true };
+}
+
 async function syncBoardToNotion(boardInput) {
   if (!notionEnabled()) return { ok: false, skipped: true, reason: 'notion env missing' };
   if (notionSyncState.running) return { ok: true, skipped: true, reason: 'sync already running' };
@@ -349,6 +396,7 @@ async function syncBoardToNotion(boardInput) {
     for (const c of cards.slice(0, 500)) {
       const rawStatus = String(c.columnId || c.priority || 'p1').toLowerCase();
       const status = ['p0', 'p1', 'p2', 'p3', 'doing', 'done'].includes(rawStatus) ? rawStatus : normalizePriority(rawStatus);
+      const latestComment = latestCommentLine(c);
       const props = {
         'Task': { title: notionRichText(c.title || 'Sem título') },
         'Card ID': { rich_text: notionRichText(c.id || '') },
@@ -364,12 +412,20 @@ async function syncBoardToNotion(boardInput) {
       const rowId = existing.get(c.id);
       if (rowId) {
         await notionRequest(`/pages/${rowId}`, 'PATCH', { properties: props });
+        if (latestComment) await syncLatestCommentToNotion(rowId, c);
         updated++;
       } else {
+        const children = [
+          { object: 'block', type: 'paragraph', paragraph: { rich_text: notionRichText(c.summary || c.notes || '') } }
+        ];
+        if (latestComment) {
+          children.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: notionRichText(`Último comentário: ${latestComment}`) } });
+        }
+
         await notionRequest('/pages', 'POST', {
           parent: { database_id: NOTION_DB_ID },
           properties: props,
-          children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: notionRichText(c.summary || c.notes || '') } }]
+          children
         });
         created++;
       }
@@ -497,9 +553,11 @@ app.post('/api/cards', auth, (req, res) => {
     proximo_passo: card.proximo_passo || '',
     risco: card.risco || '',
     tags: Array.isArray(card.tags) ? card.tags : [],
+    comments: normalizeComments(card.comments || []),
     updatedAt: new Date().toISOString()
   });
   writeBoard(board);
+  triggerNotionSync(board);
   res.json({ ok: true, id });
 });
 
@@ -516,10 +574,41 @@ app.patch('/api/cards/:id', auth, (req, res) => {
     patch.notes = compact.summary;
     if (compact.fullContext) patch.fullContext = compact.fullContext;
   }
+  if (patch.comments) patch.comments = normalizeComments(patch.comments);
 
   board.cards[idx] = { ...board.cards[idx], ...patch, updatedAt: new Date().toISOString() };
   writeBoard(board);
+  triggerNotionSync(board);
   res.json({ ok: true, card: board.cards[idx] });
+});
+
+app.post('/api/cards/:id/comments', auth, (req, res) => {
+  const board = readBoard();
+  const idx = board.cards.findIndex(c => c.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ ok: false, error: 'card não encontrado' });
+
+  const text = String(req.body?.text || '').trim();
+  const author = String(req.body?.author || 'Diego').trim() || 'Diego';
+  if (!text) return res.status(400).json({ ok: false, error: 'text obrigatório' });
+
+  const comments = normalizeComments(board.cards[idx].comments || []);
+  const comment = {
+    id: `c-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    author: author.slice(0, 80),
+    text: text.slice(0, 2000),
+    createdAt: new Date().toISOString()
+  };
+
+  comments.push(comment);
+  board.cards[idx] = {
+    ...board.cards[idx],
+    comments: comments.slice(-100),
+    updatedAt: new Date().toISOString()
+  };
+
+  writeBoard(board);
+  triggerNotionSync(board);
+  res.json({ ok: true, comment, card: board.cards[idx] });
 });
 
 // Inbox webhook para receber tarefas/informações externas
@@ -577,6 +666,7 @@ app.post('/api/inbox', auth, (req, res) => {
     updatedAt: new Date().toISOString()
   });
   writeBoard(board);
+  triggerNotionSync(board);
 
   res.json({ ok: true, id: item.id, columnId });
 });
